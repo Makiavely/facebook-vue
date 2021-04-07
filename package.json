@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "core-js": "^3.6.5",
+    "latest": "^0.2.0",
+    "postcss": "^8.2.9",
     "register-service-worker": "^1.7.1",
     "vue": "^2.6.11",
     "vue-router": "^3.2.0",
@@ -21,7 +23,14 @@
     "@vue/cli-service": "~4.5.0",
     "node-sass": "^4.12.0",
     "sass-loader": "^8.0.2",
+    "tailwindcss": "^2.1.1",
     "vue-template-compiler": "^2.6.11"
+  },
+  "postcss": {
+    "plugins": {
+      "tailwindcss": "./tailwind.js",
+      "autoprefixer": {}
+    }
   },
   "browserslist": [
     "> 1%",
