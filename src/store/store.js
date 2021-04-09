@@ -1,31 +1,25 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
+import axios from 'axios'
 
 Vue.use(Vuex)
+axios.defaults.baseURL = 'http://facebook-back.test/api'
 
 export const store = new Vuex.Store({
   state: {
+    //  token: null,
+    token: localStorage.getItem('access_token') || null,
     filter: 'all',
-    todos: [
-      {
-        'id': 1,
-        'title': 'Finish Vue Screencast',
-        'completed': false,
-        'editing': false,
-      },
-      {
-        'id': 2,
-        'title': 'Take over world',
-        'completed': false,
-        'editing': false,
-      },
-    ]
+    todos: [],
   },
   getters: {
+    loggedIn(state) {
+      return state.token !== null
+    },
     remaining(state) {
       return state.todos.filter(todo => !todo.completed).length
     },
-    anyRemaining(state,getters) {
+    anyRemaining(state, getters) {
       return getters.remaining != 0
     },
     todosFiltered(state) {
@@ -36,32 +30,11 @@ export const store = new Vuex.Store({
       } else if (state.filter == 'completed') {
         return state.todos.filter(todo => todo.completed)
       }
-
       return state.todos
     },
     showClearCompletedButton(state) {
       return state.todos.filter(todo => todo.completed).length > 0
     }
-    /*    remaining(state) {
-         return this.$store.state.todos.filter(todo => !todo.completed).length
-       },
-       anyRemaining(state) {
-         return this.remaining != 0`
-       },
-       todosFiltered(state) {
-         if (this.$store.state.filter == 'all') {
-           return this.$store.state.todos
-         } else if (this.$store.state.filter == 'active') {
-           return this.$store.state.todos.filter(todo => !todo.completed)
-         } else if (this.$store.state.filter == 'completed') {
-           return this.$store.state.todos.filter(todo => todo.completed)
-         }
-
-         return this.$store.state.todos
-       },
-       showClearCompletedButton(state) {
-         return this.$store.state.todos.filter(todo => todo.completed).length > 0
-       }*/
   },
   mutations: {
     addTodo(state, todo) {
@@ -72,80 +45,171 @@ export const store = new Vuex.Store({
         editing: false,
       })
     },
-    updateTodo(state,todo) {
-      //    const index = this.$store.state.todos.findIndex((item) => item.id == this.id);
-      //    this.$store.state.todos.splice(index, 1, {
-      const index = state.todos.findIndex((item) => item.id == todo.id);
+    updateTodo(state, todo) {
+      const index = state.todos.findIndex(item => item.id == todo.id)
       state.todos.splice(index, 1, {
-        /*        'id': this.id,
-               'title': this.title,
-               'completed': this.completed,
-               'editing': this.editing,*/
         'id': todo.id,
         'title': todo.title,
         'completed': todo.completed,
         'editing': todo.editing,
       })
     },
-    deleteTodo(state,id) {
-      /*const index = this.$store.state.todos.findIndex((item) => item.id == id);
-      this.$store.state.todos.splice(index, 1);*/
-      const index = state.todos.findIndex((item) => item.id == id);
-      state.todos.splice(index, 1);
+    deleteTodo(state, id) {
+      const index = state.todos.findIndex(item => item.id == id)
+      state.todos.splice(index, 1)
     },
-    checkAll(state,checked) {
-      //    this.$store.state.todos.forEach(todo => (todo.completed = event.target.checked));
-      //    state.todos.forEach(todo => (todo.completed = event.target.checked));
-      state.todos.forEach(todo => (todo.completed = checked));
+    checkAll(state, checked) {
+      state.todos.forEach(todo => (todo.completed = checked))
     },
-    updateFilter(state,filter) {
-      //    this.$store.state.filter = filter
+    updateFilter(state, filter) {
       state.filter = filter
     },
     clearCompleted(state) {
-      //    this.$store.state.todos = this.$store.state.todos.filter(todo => !todo.completed);
-      state.todos = state.todos.filter(todo => !todo.completed);
-    }
+      state.todos = state.todos.filter(todo => !todo.completed)
+    },
+    retrieveTodos(state, todos) {
+      state.todos = todos
+    },
+    retrieveToken(state, token) {
+      state.token = token
+    },
+    destroyToken(state) {
+      state.token = null
+    },
   },
   actions: {
+    register(context, data) {
+      return new Promise((resolve, reject) => {
+        axios.post('/register', {
+          name: data.name,
+          email: data.email,
+          password: data.password,
+        })
+            .then(response => {
+              resolve(response)
+            })
+            .catch(error => {
+              reject(error)
+            })
+      })
+    },
+    destroyToken(context) {
+      axios.defaults.headers.common['Authorization'] = 'Bearer ' + context.state.token
+
+      if (context.getters.loggedIn) {
+        return new Promise((resolve, reject) => {
+          axios.post('/logout')
+              .then(response => {
+                localStorage.removeItem('access_token')
+                context.commit('destroyToken')
+                resolve(response)
+                // console.log(response);
+                // context.commit('addTodo', response.data)
+              })
+              .catch(error => {
+                localStorage.removeItem('access_token')
+                context.commit('destroyToken')
+                reject(error)
+              })
+        })
+      }
+    },
+    retrieveToken(context, credentials) {
+
+      return new Promise((resolve, reject) => {
+        axios.post('/login', {
+          username: credentials.username,
+          password: credentials.password,
+        })
+            .then(response => {
+              const token = response.data.access_token
+
+              localStorage.setItem('access_token', token)
+              context.commit('retrieveToken', token)
+              resolve(response)
+              // console.log(response);
+              // context.commit('addTodo', response.data)
+            })
+            .catch(error => {
+              console.log(error)
+              reject(error)
+            })
+      })
+    },
+    retrieveTodos(context) {
+      axios.get('/todos')
+          .then(response => {
+            context.commit('retrieveTodos', response.data)
+          })
+          .catch(error => {
+            console.log(error)
+          })
+    },
     addTodo(context, todo) {
-      setTimeout(() => {
-        context.commit('addTodo', todo)
-      }, 1000)
-      //    context.commit('addTodo', todo)
+      axios.post('/todos', {
+        title: todo.title,
+        completed: false,
+      })
+          .then(response => {
+            context.commit('addTodo', response.data)
+          })
+          .catch(error => {
+            console.log(error)
+          })
     },
-    updateTodo(context,todo) {
-      setTimeout(() => {
-        context.commit('updateTodo', todo)
-      }, 1000)
-      //    context.commit('updateTodo', todo)
+    updateTodo(context, todo) {
+      axios.patch('/todos/' + todo.id, {
+        title: todo.title,
+        completed: todo.completed,
+      })
+          .then(response => {
+            context.commit('updateTodo', response.data)
+          })
+          .catch(error => {
+            console.log(error)
+          })
     },
-    deleteTodo(context,id) {
-      setTimeout(() => {
-        context.commit('deleteTodo', id)
-      }, 1000)
-      //    context.commit('deleteTodo', id)
+    deleteTodo(context, id) {
+      axios.delete('/todos/' + id)
+          .then(response => {
+            context.commit('deleteTodo', id)
+          })
+          .catch(error => {
+            console.log(error)
+          })
     },
-    checkAll(context,checked) {
-      setTimeout(() => {
-        context.commit('checkAll', checked)
-      }, 1000)
-      //    context.commit('checkAll', checked)
+    checkAll(context, checked) {
+      axios.patch('/todosCheckAll', {
+        completed: checked,
+      })
+          .then(response => {
+            context.commit('checkAll', checked)
+          })
+          .catch(error => {
+            console.log(error)
+          })
     },
-    updateFilter(context,filter) {
-      setTimeout(() => {
-        context.commit('updateFilter', filter)
-      }, 1000)
-      //    context.commit('updateFilter', filter)
+    updateFilter(context, filter) {
+
+      context.commit('updateFilter', filter)
+
     },
     clearCompleted(context) {
-      setTimeout(() => {
-        context.commit('clearCompleted')
-      }, 1000)
-      //    context.commit('clearCompleted')
-    },
-    /*    clearCompleted({commit}) {
-      commit('clearCompleted')
-    }*/
+      const completed = context.state.todos
+          .filter(todo => todo.completed)
+          .map(todo => todo.id)
+
+      axios.delete('/todosDeleteCompleted', {
+        data: {
+          todos: completed
+        }
+      })
+          .then(response => {
+            context.commit('clearCompleted')
+          })
+          .catch(error => {
+            console.log(error)
+          })
+    }
   }
 })
